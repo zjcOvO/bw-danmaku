@@ -1,0 +1,26 @@
+onebot:
+  ws_url: "ws://....（你的IP地址）:（你的端口号）/ws"
+  group_id: 123456789  # 替换为你的群号
+  access_token: "qwertyuiop" # 替换为你的 WS token
+
+bilibili:
+  room_id: 0  # 替换为你的直播间号
+  cookie:
+    # 参考: https://nemo2011.github.io/bilibili-api/#/get-credential，把下面每个键对应的值填上
+    SESSDATA: "yi-chuan-hen-chang-de-wen-ben"
+    bili_jct: "bi-jiao-duan-de-wen-ben"
+    BUVID3: "ni-de-buvid3"
+    BUVID4: "ni-de-buvid4"
+    DedeUserID: "da-gai-shi-ni-de-id"
+
+manual:
+  username: "我"  # 手动弹幕默认用户名
+
+display:
+  width: 1920
+  height: 1080
+  font_size: 18
+  font_color: "#FFFFFF"
+  bg_color: "#000000"
+  opacity: 0.7
+  speed: 2.0
