@@ -327,8 +327,6 @@ class DanmakuController:
             self._danmaku_window.start(on_ready=self._on_window_ready)
             logger.info("Danmaku window closed")
 
-        logger.info("DanmakuController started successfully")
-
     def stop(self) -> None:
         """
         Stop all components of the danmaku system.

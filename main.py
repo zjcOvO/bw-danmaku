@@ -29,15 +29,12 @@ class DanmakuApp:
     def start(self):
         self.logger.info("Starting py_danmaku application...")
         self.setup_signal_handlers()
+        
+        self._running = True
 
         self.controller = DanmakuController()
-        self.controller.start()
-
-        self._running = True
-        self.logger.info("py_danmaku application started successfully!")
-        print("py_danmaku application started successfully!")
-        print("Press Ctrl+C to stop")
-
+        self.controller.start() # This will block until the controller is stopped
+        
     def stop(self):
         if not self._running:
             return
