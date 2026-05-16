@@ -48,7 +48,7 @@ class DanmakuItem:
         self,
         text: str,
         source: str = "unknown",
-        y: float = random.random()*0.01+0.01,
+        y: float = 0.02,
         speed: float = 2.0,
         color: str = "#FFFFFF",
         font_size: int = 12,
@@ -179,6 +179,7 @@ class DanmakuWindow:
         if not self.running or self.root is None:
             return
 
+        self.root.update_idletasks()
         for label in self._labels[:]:
             if not label.winfo_exists():
                 self._labels.remove(label)
