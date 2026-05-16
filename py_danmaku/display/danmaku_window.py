@@ -3,9 +3,11 @@
 Borderless always-on-top overlay with fully transparent background,
 click-through, and taskbar icon. Danmaku labels are placed on a
 full-screen Canvas container and scrolled leftward each tick.
+
+Multiple danmaku are assigned to separate horizontal rows so they
+do not overlap vertically.
 """
 
-import random
 import ctypes
 import logging
 import queue
@@ -19,6 +21,10 @@ logger = logging.getLogger(__name__)
 # Sentinel colour for tkinter's -transparentcolor attribute.
 # Every pixel painted with this exact hex value becomes fully transparent.
 _TRANSPARENTCOLOR = "#010101"
+
+# Number of vertical rows into which the screen is divided.
+# Each new danmaku picks the first free row.
+_NUM_ROWS = 5
 
 # Windows extended-style constants
 _GWL_EXSTYLE = -20
@@ -48,31 +54,32 @@ class DanmakuItem:
         self,
         text: str,
         source: str = "unknown",
-        y: float = 0.02,
         speed: float = 2.0,
         color: str = "#FFFFFF",
         font_size: int = 12,
     ):
         self.text = text
         self.source = source
-        self.y = y
         self.speed = speed
         self.color = color
         self.font_size = font_size
 
 
 class DanmakuLabel(tk.Label):
-    """A single scrolling danmaku label placed on the canvas."""
+    """A single scrolling danmaku label assigned to a fixed row."""
 
     def __init__(
         self,
         parent: tk.Widget,
         item: DanmakuItem,
         screen_width: int,
-        screen_height: int,
+        row_h: int,
+        row_idx: int,
     ):
+        self.screen_width = screen_width
         self._speed = item.speed
-        start_y = int(item.y * screen_height)
+        self._row = row_idx
+        start_y = row_idx * row_h + row_h // 2
 
         super().__init__(
             parent,
@@ -86,12 +93,17 @@ class DanmakuLabel(tk.Label):
     def tick(self) -> bool:
         """Move leftward.  Return ``False`` when the label has scrolled
         past the left edge and been destroyed."""
-        new_x = self.winfo_x() - self._speed
-        if new_x < -self.winfo_width():
+        freed = False
+        old_x = self.winfo_x()
+        new_x = old_x - self._speed
+        width = self.winfo_width()
+        if new_x + width < self.screen_width and old_x + width >= self.screen_width:
+            freed = True
+        if new_x < -width:
             self.destroy()
-            return False
+            return freed,True
         self.place(x=new_x)
-        return True
+        return freed,False
 
 
 # ── Main window ─────────────────────────────────────────────────────
@@ -103,6 +115,10 @@ class DanmakuWindow:
     All tkinter operations run on the main thread via ``root.after()``
     callbacks.  The root window is full-screen, transparent, and
     click-through.
+
+    Danmaku are spread across ``_NUM_ROWS`` (18) horizontal rows.  A
+    new danmaku always picks the first currently-free row, preventing
+    vertical overlap.
     """
 
     TICK_MS = 20
@@ -115,8 +131,26 @@ class DanmakuWindow:
 
         self._screen_w: int = 1920
         self._screen_h: int = 1080
+        self._row_h: int = 28
+        self._rows: List[bool] = []
         self._queue: queue.Queue = queue.Queue()
         self._labels: List[DanmakuLabel] = []
+
+    # ── row tracking ────────────────────────────────────────────
+
+    def _pick_row(self) -> int:
+        """Return index of the first free row and mark it occupied,
+        or 0 when every row is currently in use."""
+        for i, free in enumerate(self._rows):
+            if free:
+                self._rows[i] = False
+                return i
+        return -1
+
+    def _free_row(self, idx: int) -> None:
+        """Mark *idx* as available again."""
+        if 0 <= idx < len(self._rows):
+            self._rows[idx] = True
 
     # ── window creation ─────────────────────────────────────────
 
@@ -149,6 +183,9 @@ class DanmakuWindow:
         )
         self._canvas.pack(fill=tk.BOTH, expand=True)
 
+        # Initialise row tracking
+        self._rows = [True] * _NUM_ROWS
+
         self.root.update_idletasks()
         # _setup_overlay(self.root.winfo_id())
         self.root.deiconify()
@@ -166,9 +203,12 @@ class DanmakuWindow:
             except queue.Empty:
                 break
 
-            label = DanmakuLabel(self._canvas, item, self._screen_w, self._screen_h)
-            self._labels.append(label)
-            logger.info("added label: %s, now %d labels", item.text, len(self._labels))
+            row_idx = self._pick_row()
+            if row_idx == -1:
+                logger.warning("All rows are currently occupied; dropping danmaku: %s", item.text)
+            else:
+                label = DanmakuLabel(self._canvas, item, self._screen_w, self._row_h, row_idx)
+                self._labels.append(label)
             self._queue.task_done()
 
         self.root.after(self.QUEUE_POLL_MS, self._process_queue)  # type: ignore[union-attr]
@@ -183,8 +223,10 @@ class DanmakuWindow:
         for label in self._labels[:]:
             if not label.winfo_exists():
                 self._labels.remove(label)
-            elif not label.tick():
-                self._labels.remove(label)
+            else:
+                freed, removed = label.tick()
+                if freed: self._free_row(label._row)
+                if removed: self._labels.remove(label)
 
         self.root.after(self.TICK_MS, self._animate)
 
