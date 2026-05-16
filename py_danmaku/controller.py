@@ -35,9 +35,9 @@ class DanmakuController:
 
     # Message source colors for visual distinction
     SOURCE_COLORS = {
-        "onebot": "#00FF00",  # Green for QQ/Onebot messages
-        "bilibili": "#00FFFF",  # Cyan for Bilibili messages
-        "manual": "#FF88AA",  # Pink for manual danmaku
+        "onebot": "#15b5e9",  # Blue for QQ/Onebot messages
+        "bilibili": "#FF69B4",  # Pink for Bilibili messages
+        "manual": "#FFEFD5",  # BlanchedAlmond for manual danmaku
         "unknown": "#FFFFFF",  # White for unknown sources
     }
 
@@ -193,24 +193,41 @@ class DanmakuController:
                 parsed = OnebotClient.parse_message(message)
                 text = parsed.get("text", "")
                 username = parsed.get("nickname", "Unknown")
-                display_text = f"[{username}]: {text}"
+                display_text = text     # f"[{username}]: {text}"
             elif message.get("type") == "bilibili":
                 source = "bilibili"
                 username = message.get("uname", "Unknown")
                 text = message.get("message", "")
-                display_text = f"[{username}]: {text}"
+                display_text = text     # f"[{username}]: {text}"
             elif message.get("type") == "manual":
                 source = "manual"
                 username = message.get("username", "我")
                 text = message.get("text", "")
-                display_text = f"[{username}]: {text}"
+                display_text = text     # f"[{username}]: {text}"
             else:
                 # Unknown source
                 source = "unknown"
+                username = "Unknown"
                 display_text = str(message)
+
+            # Normalise whitespace: newlines → spaces, collapse runs
+            display_text = ' '.join(display_text.split())
+            # Discard empty or overlong messages
+            if not display_text or len(display_text) > 50 or display_text[0] == '#':
+                logger.info("Discarded message (%d chars): %s", len(display_text), display_text[:30])
+                return
 
             # Get color for this source
             color = self.SOURCE_COLORS.get(source, self.SOURCE_COLORS["unknown"])
+            
+            # 添加一些彩蛋规则
+            logger.info("message send by %s:%s",username,display_text)
+            if username == "千嶂夹城": #（本项目作者）
+                color = "#FFD700"  # 金色传说！（夹带私货）
+            elif username == "黄瓜" or username == "群主":
+                color = "#0eb83b"  # 绿色
+            elif username == "咖啡":
+                color = "#cc8e34"  # 咖啡色
 
             # Create danmaku item
             display = self._config.display or {}
@@ -303,10 +320,9 @@ class DanmakuController:
         if self._danmaku_window:
             logger.info("Starting danmaku window (blocking)...")
             self._danmaku_window.add_danmaku(DanmakuItem(
-                text="py_danmaku 已启动 — 等待弹幕中...",
+                text="bw_danmaku 项目已启动 — 等待弹幕中...",
                 source="system",
-                color="#FFD700",
-                font_size=20,
+                color="#FFD700"
             ))
             self._danmaku_window.start(on_ready=self._on_window_ready)
             logger.info("Danmaku window closed")
