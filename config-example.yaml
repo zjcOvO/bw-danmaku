@@ -3,6 +3,12 @@ onebot:
   group_id: 123456789  # 替换为你的群号
   access_token: "qwertyuiop" # 替换为你的 WS token
 
+qqbot:
+  appid: "your AppId"
+  appsecret: "your AppSecret"
+  # group_openid: "your group_openid"  # QQ 官方 API 用 openid 标识群，可选；不填则接收所有已授权群
+  fetch_nickname: true  # 是否拉取群成员昵称（需要额外 API 调用，带缓存）
+
 bilibili:
   room_id: 0  # 替换为你的直播间号
   cookie:

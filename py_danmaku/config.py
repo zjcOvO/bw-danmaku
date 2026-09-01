@@ -34,6 +34,10 @@ class Config:
         return self._config.get("onebot", {})
 
     @property
+    def qqbot(self):
+        return self._config.get("qqbot", {})
+
+    @property
     def bilibili(self):
         return self._config.get("bilibili", {})
 

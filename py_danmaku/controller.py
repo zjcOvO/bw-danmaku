@@ -17,6 +17,7 @@ from py_danmaku.config import Config
 from py_danmaku.sources.bilibili_client import BilibiliClient
 from py_danmaku.sources.manual_client import ManualDanmakuClient
 from py_danmaku.sources.onebot_client import OnebotClient
+from py_danmaku.sources.qqbot_client import QQBotClient
 from py_danmaku.display.danmaku_window import DanmakuWindow, DanmakuItem
 from py_danmaku.utils.logger import setup_logger
 
@@ -36,6 +37,7 @@ class DanmakuController:
     # Message source colors for visual distinction
     SOURCE_COLORS = {
         "onebot": "#15b5e9",  # Blue for QQ/Onebot messages
+        "qqbot": "#00CED1",  # Turquoise for QQ 官方机器人群消息
         "bilibili": "#FF69B4",  # Pink for Bilibili messages
         "manual": "#FFEFD5",  # BlanchedAlmond for manual danmaku
         "unknown": "#FFFFFF",  # White for unknown sources
@@ -52,6 +54,7 @@ class DanmakuController:
 
         # Client instances
         self._onebot_client: Optional[OnebotClient] = None
+        self._qqbot_client: Optional[QQBotClient] = None
         self._bilibili_client: Optional[BilibiliClient] = None
         self._manual_client: Optional[ManualDanmakuClient] = None
         self._danmaku_window: Optional[DanmakuWindow] = None
@@ -66,6 +69,7 @@ class DanmakuController:
 
         # Source colors
         self._onebot_color = self.SOURCE_COLORS.get("onebot")
+        self._qqbot_color = self.SOURCE_COLORS.get("qqbot")
         self._bilibili_color = self.SOURCE_COLORS.get("bilibili")
 
         # Initialize components
@@ -75,11 +79,16 @@ class DanmakuController:
         logger.info("DanmakuController initialized")
 
     def _initialize_clients(self):
-        """Initialize Onebot and Bilibili clients based on configuration."""
+        """Initialize Onebot, QQ bot and Bilibili clients based on configuration."""
         # Create Onebot client if enabled in config
         self._onebot_client = self._create_onebot_client()
         if self._onebot_client:
             logger.info("Onebot client created")
+
+        # Create QQ 官方机器人 client if enabled in config
+        self._qqbot_client = self._create_qqbot_client()
+        if self._qqbot_client:
+            logger.info("QQ bot client created")
 
         # Create Bilibili client if enabled in config
         self._bilibili_client = self._create_bilibili_client()
@@ -115,6 +124,37 @@ class DanmakuController:
             ws_url=ws_url,
             group_id=group_id,
             access_token=access_token,
+            on_message=self._on_source_message,
+        )
+
+    def _create_qqbot_client(self) -> Optional[QQBotClient]:
+        """
+        Create QQ 官方机器人 client from configuration.
+
+        Returns:
+            QQBotClient instance or None if disabled/not configured.
+        """
+        qqbot_config = self._config.qqbot
+        if not qqbot_config:
+            logger.warning("No QQ bot configuration found")
+            return None
+
+        appid = qqbot_config.get("appid")
+        appsecret = qqbot_config.get("appsecret")
+        # QQ 官方 API 用 group_openid 标识群，可选；不填则接收所有已授权的群
+        group_openid = qqbot_config.get("group_openid")
+        fetch_nickname = qqbot_config.get("fetch_nickname", True)
+
+        # 未配置 AppID/AppSecret 时视为禁用
+        if not appid or not appsecret:
+            logger.info("QQ bot client is disabled (missing appid/appsecret)")
+            return None
+
+        return QQBotClient(
+            appid=appid,
+            appsecret=appsecret,
+            group_openid=group_openid,
+            fetch_nickname=fetch_nickname,
             on_message=self._on_source_message,
         )
 
@@ -198,6 +238,11 @@ class DanmakuController:
                 source = "bilibili"
                 username = message.get("uname", "Unknown")
                 text = message.get("message", "")
+                display_text = text     # f"[{username}]: {text}"
+            elif message.get("type") == "qqbot":
+                source = "qqbot"
+                username = message.get("nickname") or message.get("member_openid") or "Unknown"
+                text = message.get("text", "")
                 display_text = text     # f"[{username}]: {text}"
             elif message.get("type") == "manual":
                 source = "manual"
@@ -309,6 +354,10 @@ class DanmakuController:
             self._onebot_client.start()
             logger.info("Onebot client started")
 
+        if self._qqbot_client:
+            self._qqbot_client.start()
+            logger.info("QQ bot client started")
+
         if self._bilibili_client:
             self._bilibili_client.start()
             logger.info("Bilibili client started")
@@ -349,6 +398,11 @@ class DanmakuController:
             self._onebot_client.stop()
             logger.info("Onebot client stopped")
 
+        # Stop QQ 官方机器人 client
+        if self._qqbot_client:
+            self._qqbot_client.stop()
+            logger.info("QQ bot client stopped")
+
         # Stop manual danmaku client
         if self._manual_client:
             self._manual_client.stop()
@@ -380,6 +434,11 @@ class DanmakuController:
     def onebot_client(self) -> Optional[OnebotClient]:
         """Get the Onebot client instance."""
         return self._onebot_client
+
+    @property
+    def qqbot_client(self) -> Optional[QQBotClient]:
+        """Get the QQ 官方机器人 client instance."""
+        return self._qqbot_client
 
     @property
     def bilibili_client(self) -> Optional[BilibiliClient]:
